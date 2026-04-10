@@ -59,7 +59,6 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.getAllBookings());
     }
 
-    // ADMIN endpoints
     @GetMapping("/bookings/{bookingId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<BookingDTO> getBookingById(@PathVariable Long bookingId) {
