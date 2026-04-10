@@ -33,13 +33,17 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final CustomerRepository customerRepository;
     private final CourtRepository courtRepository;
+    private final CurrencyService currencyService;
 
     public BookingService(BookingRepository bookingRepository,
-                          CustomerRepository customerRepository,
-                          CourtRepository courtRepository) {
+    CustomerRepository customerRepository,
+    CourtRepository courtRepository,
+    CurrencyService currencyService) {
+
         this.bookingRepository = bookingRepository;
         this.customerRepository = customerRepository;
         this.courtRepository = courtRepository;
+        this.currencyService = currencyService;
     }
 
     public List<BookingDTO> getAllBookings() {
@@ -73,8 +77,7 @@ public class BookingService {
             final LocalTime slotStart = current;
             final LocalTime slotEnd = next;
 
-            boolean isBooked = existingBookings.stream().anyMatch(b ->
-                    b.getStartTime().isBefore(slotEnd) && b.getEndTime().isAfter(slotStart));
+            boolean isBooked = existingBookings.stream().anyMatch(b -> b.getStartTime().isBefore(slotEnd) && b.getEndTime().isAfter(slotStart));
 
             if (!isBooked) {
                 BookingDTO slot = new BookingDTO();
@@ -109,8 +112,7 @@ public class BookingService {
 
         BigDecimal priceSek = calculatePrice(court, dto.getStartTime(), dto.getEndTime());
         booking.setTotalPriceSek(priceSek);
-        // EUR-konvertering läggs till senare när teamets tjänst är klar
-        booking.setTotalPriceEur(BigDecimal.ZERO);
+        booking.setTotalPriceEur(currencyService.convertSekToEur(priceSek));
 
         Booking saved = bookingRepository.save(booking);
         logger.info("customer {} created booking {} for court {} on {}",
@@ -133,15 +135,14 @@ public class BookingService {
             booking.setCourt(court);
         }
 
-        validateNoOverlap(booking.getCourt().getId(), booking.getDate(),
-                booking.getStartTime(), booking.getEndTime(), bookingId);
+        validateNoOverlap(booking.getCourt().getId(), booking.getDate(), booking.getStartTime(), booking.getEndTime(), bookingId);
 
         BigDecimal priceSek = calculatePrice(booking.getCourt(), booking.getStartTime(), booking.getEndTime());
         booking.setTotalPriceSek(priceSek);
+        booking.setTotalPriceEur(currencyService.convertSekToEur(priceSek));
 
         Booking saved = bookingRepository.save(booking);
-        logger.info("customer updated booking {} for court {} on {}",
-                saved.getId(), saved.getCourt().getName(), saved.getDate());
+        logger.info("customer updated booking {} for court {} on {}", saved.getId(), saved.getCourt().getName(), saved.getDate());
         return toDTO(saved);
     }
 
@@ -150,8 +151,7 @@ public class BookingService {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Booking not found with id: " + id));
         bookingRepository.delete(booking);
-        logger.info("admin deleted booking {} (court={}, date={})",
-                id, booking.getCourt().getName(), booking.getDate());
+        logger.info("admin deleted booking {} (court={}, date={})", id, booking.getCourt().getName(), booking.getDate());
     }
 
     private void validateNoOverlap(Long courtId, LocalDate date, LocalTime start, LocalTime end, Long excludeBookingId) {
